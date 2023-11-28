@@ -3,9 +3,6 @@ const { makeWASocket, makeInMemoryStore, useMultiFileAuthState, DisconnectReason
 const fs = require('fs')
 let pino = require('pino')
 
-const { commands } = require('./src/commands.js')
-const { scheduled } = require('./src/scheduled.js')
-
 async function connectToWhatsApp() {
     const store = makeInMemoryStore({
         logger: pino().child({
@@ -40,20 +37,28 @@ async function connectToWhatsApp() {
     sock.ev.on('creds.update', saveCreds)
 
     sock.ev.on('messages.upsert', async ({ messages }) => {
-        try {
-            if (!messages[0].key.fromMe) {
-        		commands(sock, messages)
-            }
-    	} catch(err) {
-    		console.error('* Error:', err)
-    	}
+        
+        const m = messages[0]
+        if (!m.message) return
+        
+        const id = m.key.remoteJid
+        
+        var body = (type === 'conversation') ? m.message.conversation : (type == 'imageMessage') ? m.message.imageMessage.caption : (type == 'videoMessage') ? m.message.videoMessage.caption : (type == 'extendedTextMessage') ? m.message.extendedTextMessage.text : (type == 'buttonsResponseMessage') ? m.message.buttonsResponseMessage.selectedButtonId : (m.message.listResponseMessage && m.message.listResponseMessage.singleSelectReply.selectedRowId.startsWith(prefix) && m.message.listResponseMessage.singleSelectReply.selectedRowId) ? m.message.listResponseMessage.singleSelectReply.selectedRowId : (type == 'templateButtonReplyMessage') ? m.message.templateButtonReplyMessage.selectedId : (type === 'messagecontextInfo') ? (m.message.buttonsResponseMessage?.selectedButtonId || m.message.listResponseMessage?.singleSelectReply.selectedRowId || m.text) : ''
+        const command = body.startsWith('!') ? body.toLowerCase().slice(1).trim() : null
+
+        const send = (response) => {
+            sock.sendMessage(id, { text: response }, { quoted: m })
+        }
+        
+        switch (command) {
+            case 'ping':
+                send('pong')
+                break
+                
+            default:
+                send('unknown command')
+        }
     })
-    
-    try {
-        scheduled(sock)
-    } catch(err) {
-        console.error('* Error:', err)
-    }
     
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect } = update
