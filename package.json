@@ -1,7 +1,7 @@
 {
   "name": "Elmo",
   "version": "1.0.0",
-  "description": "Bot do Box-to-box.",
+  "description": "",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
